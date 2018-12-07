@@ -5,8 +5,9 @@
 # Title: Receiver for NOAA APT
 # Author: Guilherme Theis and Sébastien Descombes
 # Description: This is a receiver block for NOAA APT images the rest of the processing is done by another software
-# Generated: Thu Nov 15 14:48:22 2018
+# Generated: Fri Dec  7 11:04:04 2018
 ##################################################
+
 
 if __name__ == '__main__':
     import ctypes
@@ -37,9 +38,9 @@ import time
 import wx
 
 
-class Radio2Matlab(grc_wxgui.top_block_gui):
+class Radio2Matlab_APT(grc_wxgui.top_block_gui):
 
-    def __init__(self, antenna='RX1', audioRate=192000, bandwidth=40E3, centerFrequency=137.9125E6, gain=10, outputFile="/results/output.data", samplingRate=1000000):
+    def __init__(self, antenna='RX1', audioRate=192000, bandwidth=40E3, centerFrequency=137.1E6, gain=10, outputFile="/results/output.data", samplingRate=1000000):
         grc_wxgui.top_block_gui.__init__(self, title="Receiver for NOAA APT")
         _icon_path = "/usr/share/icons/hicolor/32x32/apps/gnuradio-grc.png"
         self.SetIcon(wx.Icon(_icon_path, wx.BITMAP_TYPE_ANY))
@@ -58,8 +59,13 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
         ##################################################
         # Blocks
         ##################################################
+        self.notebook_0 = self.notebook_0 = wx.Notebook(self.GetWin(), style=wx.NB_TOP)
+        self.notebook_0.AddPage(grc_wxgui.Panel(self.notebook_0), "FMSignal")
+        self.notebook_0.AddPage(grc_wxgui.Panel(self.notebook_0), "FMWaterfall")
+        self.notebook_0.AddPage(grc_wxgui.Panel(self.notebook_0), "DemodSignal")
+        self.Add(self.notebook_0)
         self.wxgui_waterfallsink2_0 = waterfallsink2.waterfall_sink_c(
-        	self.GetWin(),
+        	self.notebook_0.GetPage(1).GetWin(),
         	baseband_freq=centerFrequency,
         	dynamic_range=100,
         	ref_level=0,
@@ -71,7 +77,23 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
         	avg_alpha=None,
         	title='Waterfall Plot',
         )
-        self.Add(self.wxgui_waterfallsink2_0.win)
+        self.notebook_0.GetPage(1).Add(self.wxgui_waterfallsink2_0.win)
+        self.wxgui_fftsink2_0_1 = fftsink2.fft_sink_f(
+        	self.notebook_0.GetPage(2).GetWin(),
+        	baseband_freq=0,
+        	y_per_div=10,
+        	y_divs=10,
+        	ref_level=0,
+        	ref_scale=2.0,
+        	sample_rate=audioRate,
+        	fft_size=1024,
+        	fft_rate=15,
+        	average=False,
+        	avg_alpha=None,
+        	title='AudioOutput',
+        	peak_hold=False,
+        )
+        self.notebook_0.GetPage(2).Add(self.wxgui_fftsink2_0_1.win)
         self.wxgui_fftsink2_0_0 = fftsink2.fft_sink_c(
         	self.GetWin(),
         	baseband_freq=centerFrequency,
@@ -89,7 +111,7 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
         )
         self.Add(self.wxgui_fftsink2_0_0.win)
         self.wxgui_fftsink2_0 = fftsink2.fft_sink_c(
-        	self.GetWin(),
+        	self.notebook_0.GetPage(0).GetWin(),
         	baseband_freq=centerFrequency,
         	y_per_div=10,
         	y_divs=10,
@@ -102,8 +124,9 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
         	avg_alpha=None,
         	title='Avant filtre',
         	peak_hold=False,
+        	win=window.hanning,
         )
-        self.Add(self.wxgui_fftsink2_0.win)
+        self.notebook_0.GetPage(0).Add(self.wxgui_fftsink2_0.win)
         self.uhd_usrp_source_0 = uhd.usrp_source(
         	",".join(("", "")),
         	uhd.stream_args(
@@ -116,33 +139,39 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
         self.uhd_usrp_source_0.set_gain(gain, 0)
         self.uhd_usrp_source_0.set_antenna(antenna, 0)
         self.uhd_usrp_source_0.set_bandwidth(bandwidth, 0)
+        self.rational_resampler_xxx_1 = filter.rational_resampler_fff(
+                interpolation=192,
+                decimation=48,
+                taps=None,
+                fractional_bw=None,
+        )
         self.rational_resampler_xxx_0 = filter.rational_resampler_ccc(
                 interpolation=audioRate,
                 decimation=samplingRate,
                 taps=None,
                 fractional_bw=None,
         )
-        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, outputFile, False)
+        self.blocks_wavfile_sink_0 = blocks.wavfile_sink('/net/e/gtheis/code/Projet_SRT_2018/outputfiles/output', 1, audioRate, 8)
+        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, '/net/e/gtheis/code/Projet_SRT_2018/outputfiles/outputfile_complex', False)
         self.blocks_file_sink_0.set_unbuffered(False)
         self.band_pass_filter_0 = filter.fir_filter_ccf(1, firdes.band_pass(
         	1, samplingRate, centerFrequency-bandwidth/2, centerFrequency+bandwidth/2, bandwidth/2/6, firdes.WIN_HAMMING, 6.76))
         self.audio_sink_0 = audio.sink(48000, '', True)
-        self.analog_nbfm_rx_0 = analog.nbfm_rx(
-        	audio_rate=4,
+        self.analog_wfm_rcv_0 = analog.wfm_rcv(
         	quad_rate=audioRate,
-        	tau=75e-6,
-        	max_dev=17e3,
-          )
-
-
+        	audio_decimation=1,
+        )
 
         ##################################################
         # Connections
         ##################################################
-        self.connect((self.analog_nbfm_rx_0, 0), (self.audio_sink_0, 0))
+        self.connect((self.analog_wfm_rcv_0, 0), (self.rational_resampler_xxx_1, 0))
         self.connect((self.band_pass_filter_0, 0), (self.rational_resampler_xxx_0, 0))
         self.connect((self.band_pass_filter_0, 0), (self.wxgui_fftsink2_0_0, 0))
-        self.connect((self.rational_resampler_xxx_0, 0), (self.analog_nbfm_rx_0, 0))
+        self.connect((self.rational_resampler_xxx_0, 0), (self.analog_wfm_rcv_0, 0))
+        self.connect((self.rational_resampler_xxx_1, 0), (self.audio_sink_0, 0))
+        self.connect((self.rational_resampler_xxx_1, 0), (self.blocks_wavfile_sink_0, 0))
+        self.connect((self.rational_resampler_xxx_1, 0), (self.wxgui_fftsink2_0_1, 0))
         self.connect((self.uhd_usrp_source_0, 0), (self.band_pass_filter_0, 0))
         self.connect((self.uhd_usrp_source_0, 0), (self.blocks_file_sink_0, 0))
         self.connect((self.uhd_usrp_source_0, 0), (self.wxgui_fftsink2_0, 0))
@@ -160,6 +189,7 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
 
     def set_audioRate(self, audioRate):
         self.audioRate = audioRate
+        self.wxgui_fftsink2_0_1.set_sample_rate(self.audioRate)
 
     def get_bandwidth(self):
         return self.bandwidth
@@ -193,7 +223,6 @@ class Radio2Matlab(grc_wxgui.top_block_gui):
 
     def set_outputFile(self, outputFile):
         self.outputFile = outputFile
-        self.blocks_file_sink_0.open(self.outputFile)
 
     def get_samplingRate(self):
         return self.samplingRate
@@ -220,7 +249,7 @@ def argument_parser():
         "-b", "--bandwidth", dest="bandwidth", type="eng_float", default=eng_notation.num_to_str(40E3),
         help="Set bw [default=%default]")
     parser.add_option(
-        "-f", "--centerFrequency", dest="centerFrequency", type="eng_float", default=eng_notation.num_to_str(137.9125E6),
+        "-f", "--centerFrequency", dest="centerFrequency", type="eng_float", default=eng_notation.num_to_str(137.1E6),
         help="Set center_freq [default=%default]")
     parser.add_option(
         "-g", "--gain", dest="gain", type="intx", default=10,
@@ -234,7 +263,7 @@ def argument_parser():
     return parser
 
 
-def main(top_block_cls=Radio2Matlab, options=None):
+def main(top_block_cls=Radio2Matlab_APT, options=None):
     if options is None:
         options, _ = argument_parser().parse_args()
 
